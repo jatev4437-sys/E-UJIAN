@@ -31,7 +31,71 @@
       try { localStorage.removeItem(key); } catch (err) { /* ignore */ }
     }
   };
+  /* ---------------- Cloud (Firebase) ---------------- */
+  function cloudLoginGuru() {
+    if (!window.fb) return Promise.resolve(false);
+    return window.fb.isGuru().then(function (ok) {
+      if (ok) return true;
+      return new Promise(function (resolve) {
+        openModal({
+          title: 'Masuk Database (Guru)',
+          subtitle: 'Diperlukan untuk menyimpan data ke database online.',
+          body: '<div class="field"><label for="fbEmail">Email guru</label><input class="input" id="fbEmail" type="email" autocomplete="username"></div>' +
+                '<div class="field"><label for="fbPass">Kata sandi</label><input class="input" id="fbPass" type="password" autocomplete="current-password"></div>' +
+                '<p class="form-error" id="fbErr" hidden></p>',
+          footer: '<button type="button" class="btn outline" id="fbCancel">Batal</button><button type="button" class="btn" id="fbOk">Masuk</button>'
+        });
+        document.getElementById('fbCancel').onclick = function () { closeModal(); resolve(false); };
+        document.getElementById('fbOk').onclick = function () {
+          var err = document.getElementById('fbErr');
+          window.fb.loginGuru(document.getElementById('fbEmail').value.trim(), document.getElementById('fbPass').value)
+            .then(function () { closeModal(); toast('Berhasil masuk ke database.'); resolve(true); })
+            .catch(function () { err.hidden = false; err.textContent = 'Email atau kata sandi salah.'; });
+        };
+      });
+    });
+  }
 
+  function cloudPullSoal() {
+    if (!window.fb) return Promise.resolve(false);
+    var timeout = new Promise(function (res) { setTimeout(function () { res('timeout'); }, 7000); });
+    return Promise.race([window.fb.pullSoal(), timeout]).then(function (list) {
+      if (!Array.isArray(list)) { toast('Database lambat merespons, memakai data di perangkat ini.', 'danger'); return false; }
+      if (list.length) { store.set('eujian.soalExtra', list); store.set('eujian.soalDeleted', []); }
+      return true;
+    }).catch(function (e) { console.error(e); return false; });
+  }
+
+  function cloudSaveSoal(q) {
+    return cloudLoginGuru().then(function (ok) {
+      if (!ok) { toast('Soal hanya tersimpan di perangkat ini (belum masuk database).', 'danger'); return; }
+      return window.fb.saveSoal(q).then(function () { toast('Soal tersimpan ke database online.'); })
+        .catch(function (e) { console.error(e); toast('Gagal menyimpan ke database: ' + (e.code || e.message), 'danger'); });
+    });
+  }
+
+  function cloudSaveSoalMany(list) {
+    return cloudLoginGuru().then(function (ok) {
+      if (!ok) { toast('Soal hanya tersimpan di perangkat ini (belum masuk database).', 'danger'); return; }
+      return window.fb.saveSoalMany(list).then(function () { toast(list.length + ' soal tersimpan ke database online.'); })
+        .catch(function (e) { console.error(e); toast('Gagal menyimpan ke database: ' + (e.code || e.message), 'danger'); });
+    });
+  }
+
+  function cloudDeleteSoal(id) {
+    return cloudLoginGuru().then(function (ok) {
+      if (!ok) return;
+      return window.fb.deleteSoal(id).catch(function (e) { console.error(e); toast('Gagal menghapus di database.', 'danger'); });
+    });
+  }
+
+  function cloudPullHasil() {
+    if (!window.fb) return Promise.resolve(false);
+    return cloudLoginGuru().then(function (ok) {
+      if (!ok) return false;
+      return window.fb.pullHasil().then(function (list) { store.set('eujian.attempts', list); return true; });
+    }).catch(function (e) { console.error(e); return false; });
+  }
   function safeImageSrc(value) {
     var src = String(value || '');
     if (/^data:image\/(png|jpe?g|webp);base64,/i.test(src)) return src;
