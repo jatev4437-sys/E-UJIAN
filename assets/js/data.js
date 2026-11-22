@@ -177,7 +177,7 @@ window.EXAM_DATA = (function () {
       jawaban: 'Rubrik: penggunaan kosakata, susunan kalimat, dan ketepatan tulisan Arab.'
     }
   ];
-
+questions.length = 0;
   const exam = {
     mapel: 'Matematika',
     kelas: 'Kelas 6',
